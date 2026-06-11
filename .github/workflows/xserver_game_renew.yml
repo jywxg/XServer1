@@ -24,25 +24,19 @@ jobs:
         run: pip install requests --quiet
 
       - name: 🛡️ 启动 GOST 代理转发
+        if: ${{ env.GOST_PROXY != '' }}
+        env:
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
         run: |
-          if [ -z "$GOST_PROXY" ]; then exit 0; fi
-          SINGBOX_VER="1.11.0"
-          echo "📦 下载 sing-box v${SINGBOX_VER}..."
-          wget -q "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
-          tar -xzf "sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
-          mv "sing-box-${SINGBOX_VER}-linux-amd64/sing-box" ./sing-box
-          chmod +x ./sing-box
-          echo "🔗 解析代理协议..."
-          python3 proxy_handler.py
-          if [ -f config.json ]; then
-            echo "✅ 代理配置已生成"
-            nohup ./sing-box run -c config.json > singbox.log 2>&1 &
-            sleep 5
-            echo "✅ Proxy tunnel started"
-          else
-            echo "❌ 代理配置生成失败"
-            exit 1
-          fi
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          nohup ./gost -L http://:8080 -F "$GOST_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "✅ GOST 已启动，测试连通性..."
+          curl -s -x http://127.0.0.1:8080 https://api.ipify.org | sed 's/\.[0-9]*$/.**/' && echo
 
       - name: 🔧 执行续期
         env:
